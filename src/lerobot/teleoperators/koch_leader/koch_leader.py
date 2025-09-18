@@ -48,18 +48,24 @@ class KochLeader(Teleoperator):
             port=self.config.port,
             motors={
                 "shoulder_pan": Motor(1, "xl330-m077", MotorNormMode.RANGE_M100_100),
-                "shoulder_lift": Motor(2, "xl330-m077", MotorNormMode.RANGE_M100_100),
+                "shoulder_lift": Motor(2, "xm430-w350", MotorNormMode.RANGE_M100_100),
                 "elbow_flex": Motor(3, "xl330-m077", MotorNormMode.RANGE_M100_100),
                 "wrist_flex": Motor(4, "xl330-m077", MotorNormMode.RANGE_M100_100),
-                "wrist_roll": Motor(5, "xl330-m077", MotorNormMode.RANGE_M100_100),
-                "gripper": Motor(6, "xl330-m077", MotorNormMode.RANGE_0_100),
+                "wrist_yaw": Motor(5, "xl330-m077", MotorNormMode.RANGE_M100_100),
+                "wrist_roll": Motor(6, "xl330-m077", MotorNormMode.RANGE_M100_100),
+                "gripper": Motor(7, "xl330-m077", MotorNormMode.RANGE_0_100),
             },
             calibration=self.calibration,
         )
 
     @property
+    # def action_features(self) -> dict[str, type]:
+        # return {f"{motor}.pos": float for motor in self.bus.motors}
+    
     def action_features(self) -> dict[str, type]:
-        return {f"{motor}.pos": float for motor in self.bus.motors}
+        # Change from motor names to generic joint names to match expected format
+        motor_names = list(self.bus.motors.keys())
+        return {f"joint_{i}.pos": float for i, motor in enumerate(motor_names)}
 
     @property
     def feedback_features(self) -> dict[str, type]:
@@ -68,7 +74,6 @@ class KochLeader(Teleoperator):
     @property
     def is_connected(self) -> bool:
         return self.bus.is_connected
-
     def connect(self, calibrate: bool = True) -> None:
         if self.is_connected:
             raise DeviceAlreadyConnectedError(f"{self} already connected")
@@ -79,7 +84,6 @@ class KochLeader(Teleoperator):
                 "Mismatch between calibration values in the motor and the calibration file or no calibration file found"
             )
             self.calibrate()
-
         self.configure()
         logger.info(f"{self} connected.")
 
@@ -102,22 +106,20 @@ class KochLeader(Teleoperator):
         for motor in self.bus.motors:
             self.bus.write("Operating_Mode", motor, OperatingMode.EXTENDED_POSITION.value)
 
-        self.bus.write("Drive_Mode", "elbow_flex", DriveMode.INVERTED.value)
-        drive_modes = {motor: 1 if motor == "elbow_flex" else 0 for motor in self.bus.motors}
+        # self.bus.write("Drive_Mode", "elbow_flex", DriveMode.INVERTED.value)
+        drive_modes = {motor: 0 for motor in self.bus.motors}
 
         input(f"Move {self} to the middle of its range of motion and press ENTER....")
         homing_offsets = self.bus.set_half_turn_homings()
 
-        full_turn_motors = ["shoulder_pan", "wrist_roll"]
-        unknown_range_motors = [motor for motor in self.bus.motors if motor not in full_turn_motors]
-        print(
-            f"Move all joints except {full_turn_motors} sequentially through their "
-            "entire ranges of motion.\nRecording positions. Press ENTER to stop..."
-        )
+        # full_turn_motors = ["shoulder_pan", "wrist_roll"]
+        unknown_range_motors = [motor for motor in self.bus.motors]
+        # print(
+        #     f"Move all joints except {full_turn_motors} sequentially through their "
+        #     "entire ranges of motion.\nRecording positions. Press ENTER to stop..."
+        # )
         range_mins, range_maxes = self.bus.record_ranges_of_motion(unknown_range_motors)
-        for motor in full_turn_motors:
-            range_mins[motor] = 0
-            range_maxes[motor] = 4095
+
 
         self.calibration = {}
         for motor, m in self.bus.motors.items():
@@ -151,9 +153,10 @@ class KochLeader(Teleoperator):
         # to make it move, and it will move back to its original target position when we release the force.
         self.bus.write("Operating_Mode", "gripper", OperatingMode.CURRENT_POSITION.value)
         # Set gripper's goal pos in current position mode so that we can use it as a trigger.
-        self.bus.enable_torque("gripper")
+        # self.bus.enable_torque("gripper")
         if self.is_calibrated:
-            self.bus.write("Goal_Position", "gripper", self.config.gripper_open_pos)
+            # self.bus.write("Goal_Position", "gripper", self.config.gripper_open_pos)
+            pass
 
     def setup_motors(self) -> None:
         for motor in reversed(self.bus.motors):
@@ -161,13 +164,24 @@ class KochLeader(Teleoperator):
             self.bus.setup_motor(motor)
             print(f"'{motor}' motor id set to {self.bus.motors[motor].id}")
 
-    def get_action(self) -> dict[str, float]:
-        if not self.is_connected:
-            raise DeviceNotConnectedError(f"{self} is not connected.")
+    # def get_action(self) -> dict[str, float]:
+    #     if not self.is_connected:
+    #         raise DeviceNotConnectedError(f"{self} is not connected.")
 
+    #     start = time.perf_counter()
+    #     action = self.bus.sync_read("Present_Position")
+    #     action = {f"{motor}.pos": val for motor, val in action.items()}
+    #     dt_ms = (time.perf_counter() - start) * 1e3
+    #     logger.debug(f"{self} read action: {dt_ms:.1f}ms")
+    #     return action
+    
+    
+    def get_action(self) -> dict[str, float]:
         start = time.perf_counter()
         action = self.bus.sync_read("Present_Position")
-        action = {f"{motor}.pos": val for motor, val in action.items()}
+        # Map motor names to generic joint names
+        motor_names = list(self.bus.motors.keys())
+        action = {f"joint_{i}.pos": val for i, (motor, val) in enumerate(action.items())}
         dt_ms = (time.perf_counter() - start) * 1e3
         logger.debug(f"{self} read action: {dt_ms:.1f}ms")
         return action
