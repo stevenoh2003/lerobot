@@ -855,7 +855,7 @@ class MotorsBus(abc.ABC):
 
         max_value = {1: 0xFF, 2: 0xFFFF, 4: 0xFFFFFFFF}.get(length)
         if max_value is None:
-            raise NotImplementedError(f"Unsupported byte size: {length}. Expected [1, 2, 4].")
+            raise NotImplementedError(f"Unsupported byate size: {length}. Expected [1, 2, 4].")
 
         if value > max_value:
             raise ValueError(f"Value {value} exceeds the maximum for {length} bytes ({max_value}).")
@@ -1056,7 +1056,7 @@ class MotorsBus(abc.ABC):
         motors: str | list[str] | None = None,
         *,
         normalize: bool = True,
-        num_retry: int = 0,
+        num_retry: int = 6,
     ) -> dict[str, Value]:
         """Read the same register from several motors at once.
 
@@ -1183,6 +1183,7 @@ class MotorsBus(abc.ABC):
             ids_values = self._unnormalize(ids_values)
 
         ids_values = self._encode_sign(data_name, ids_values)
+        
 
         err_msg = f"Failed to sync write '{data_name}' with {ids_values=} after {num_retry + 1} tries."
         self._sync_write(addr, length, ids_values, num_retry=num_retry, raise_on_error=True, err_msg=err_msg)

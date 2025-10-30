@@ -198,9 +198,10 @@ def record_loop(
     control_time_s: int | None = None,
     single_task: str | None = None,
     display_data: bool = False,
+    inference: bool = False
 ):
-    if dataset is not None and dataset.fps != fps:
-        raise ValueError(f"The dataset fps should be equal to requested fps ({dataset.fps} != {fps}).")
+    # if dataset is not None and dataset.fps != fps:
+    #     raise ValueError(f"The dataset fps should be equal to requested fps ({dataset.fps} != {fps}).")
 
     teleop_arm = teleop_keyboard = None
     if isinstance(teleop, list):
@@ -277,7 +278,7 @@ def record_loop(
         # so action actually sent is saved in the dataset.
         sent_action = robot.send_action(action)
 
-        if dataset is not None:
+        if not inference and dataset is not None:
             action_frame = build_dataset_frame(dataset.features, sent_action, prefix="action")
             frame = {**observation_frame, **action_frame}
             dataset.add_frame(frame, task=single_task)

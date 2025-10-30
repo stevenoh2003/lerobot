@@ -52,11 +52,28 @@ class KochLeader(Teleoperator):
                 "elbow_flex": Motor(3, "xl330-m077", MotorNormMode.RANGE_M100_100),
                 "wrist_flex": Motor(4, "xl330-m077", MotorNormMode.RANGE_M100_100),
                 "wrist_yaw": Motor(5, "xl330-m077", MotorNormMode.RANGE_M100_100),
-                "wrist_roll": Motor(6, "xl330-m077", MotorNormMode.RANGE_M100_100),
+                "wrist_roll": Motor(6, "xl430-w250", MotorNormMode.RANGE_M100_100),
                 "gripper": Motor(7, "xl330-m077", MotorNormMode.RANGE_0_100),
             },
             calibration=self.calibration,
         )
+        
+        # norm_mode_body = MotorNormMode.RANGE_M100_100
+
+        # self.bus = DynamixelMotorsBus(
+        #     port=self.config.port,
+        #     motors={
+        #         "joint_0": Motor(1, "xm430-w350", norm_mode_body),
+        #         "joint_1": Motor(2, "xm430-w350", norm_mode_body),
+        #         "joint_2": Motor(3, "xm430-w350", norm_mode_body),
+        #         "joint_3": Motor(4, "xl430-w250", norm_mode_body),
+        #         "joint_4": Motor(5, "xl430-w250", norm_mode_body),
+        #         "joint_5": Motor(6, "xl430-w250", norm_mode_body),
+        #         "gripper": Motor(7, "xl330-m077", MotorNormMode.RANGE_0_100),
+
+        #     },
+        #     calibration=self.calibration,
+        # )
 
     @property
     # def action_features(self) -> dict[str, type]:
@@ -146,12 +163,16 @@ class KochLeader(Teleoperator):
                 # point
                 self.bus.write("Operating_Mode", motor, OperatingMode.EXTENDED_POSITION.value)
 
+
+
+        # self.bus.write("Operating_Mode", "gripper", OperatingMode.CURRENT_POSITION.value) # TODO uncomment 
+
+
         # Use 'position control current based' for gripper to be limited by the limit of the current.
         # For the follower gripper, it means it can grasp an object without forcing too much even tho,
         # its goal position is a complete grasp (both gripper fingers are ordered to join and reach a touch).
         # For the leader gripper, it means we can use it as a physical trigger, since we can force with our finger
         # to make it move, and it will move back to its original target position when we release the force.
-        self.bus.write("Operating_Mode", "gripper", OperatingMode.CURRENT_POSITION.value)
         # Set gripper's goal pos in current position mode so that we can use it as a trigger.
         # self.bus.enable_torque("gripper")
         if self.is_calibrated:

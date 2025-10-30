@@ -34,8 +34,8 @@ class PiperSDKInterface:
         # #     # self.piper.EmergencyStop(0x02)  # resume
         if self.piper.GetArmStatus().arm_status.ctrl_mode!=0x1:
             input("Press Enter to set control mode to 0x1")
-            self.piper.MotionCtrl_1(0x02,0,0)#恢复
-            self.piper.MotionCtrl_2(0, 0, 0, 0x00)#位置速度模式
+            self.piper.MotionCtrl_1(emergency_stop=0x02, track_ctrl=0, grag_teach_ctrl=0)#恢复
+            self.piper.MotionCtrl_2(ctrl_mode=0x01, move_mode=0, move_spd_rate_ctrl=0, is_mit_mode=0x00)#位置速度模式
             
             
         print(self.piper.GetArmStatus())
@@ -45,19 +45,35 @@ class PiperSDKInterface:
 
 
         # # Set motion control to joint mode at 100% speed
-        
-        while( not self.piper.EnablePiper()):
-            time.sleep(0.01)
+
+        self.piper.EnableArm(7, 0x02)  # enable all joints
+        time.sleep(0.1)
+
         self.piper.JointConfig(7, clear_err=0xAE)  # clear all joint errors
-        self.piper.ModeCtrl(0x01, 0x01, 40, 0x00)
+        self.piper.ModeCtrl(0x01, 0x01, 50, 0x00)
 
         # self.piper.MotionCtrl_2(0x01, 0x01, 70, 0x00)
-        self.piper.JointMaxAccConfig(max_joint_acc=100)
+        self.piper.JointMaxAccConfig(motor_num=1, max_joint_acc=500)
+        self.piper.JointMaxAccConfig(motor_num=2, max_joint_acc=200)
+        self.piper.JointMaxAccConfig(motor_num=3, max_joint_acc=200)
+        self.piper.JointMaxAccConfig(motor_num=4, max_joint_acc=500)
+        self.piper.JointMaxAccConfig(motor_num=5, max_joint_acc=500)
+        self.piper.JointMaxAccConfig(motor_num=6, max_joint_acc=500)
+        # self.piper.JointMaxAccConfig(max_joint_acc=50)
         
-        # self.piper.EnableArm()
-
-
-
+        print("Robot config", self.piper.GetAllMotorAngleLimitMaxSpd())
+        input("Press Enter to continue...")
+        ## Previous speed settings
+        # self.piper.MotorMaxSpdSet(motor_num=4, max_joint_spd=300)
+        # self.piper.MotorMaxSpdSet(motor_num=5, max_joint_spd=300)
+        # self.piper.MotorMaxSpdSet(motor_num=6, max_joint_spd=300)
+        
+        
+        # Improved speed settings
+        self.piper.MotorMaxSpdSet(motor_num=4, max_joint_spd=1500) # was 300
+        self.piper.MotorMaxSpdSet(motor_num=5, max_joint_spd=3000) # was 300
+        self.piper.MotorMaxSpdSet(motor_num=6, max_joint_spd=3000) # was 300
+        
         
         # # Get the min and max positions for each joint and gripper
         angel_status = self.piper.GetAllMotorAngleLimitMaxSpd()
@@ -168,6 +184,7 @@ class PiperSDKInterface:
 
     def get_arm_status(self):
         return self.piper.GetArmStatus()
+    
     def get_status(self) -> dict[str, Any]:
         joint_status = self.piper.GetArmJointMsgs()
         gripper = self.piper.GetArmGripperMsgs()
@@ -190,4 +207,15 @@ class PiperSDKInterface:
         return obs_dict
 
     def home(self):
-        self.piper.JointCtrl(0, 0, 0, 0, 25000, 0)
+        self.piper.ModeCtrl(0x01, 0x01, 10, 0x00) # decrease speed for homing
+        time.sleep(0.1)
+        self.piper.JointCtrl(0, 0, 0, 0, 0, 0)
+        self.piper.ModeCtrl(0x01, 0x01, 30, 0x00) # decrease speed for homing
+
+
+    def home_ready(self):
+        self.piper.ModeCtrl(0x01, 0x01, 10, 0x00) # decrease speed for homing
+        time.sleep(0.1)
+        self.piper.JointCtrl(0, 56179, -62415, 1625, 61228, 0)
+        self.piper.ModeCtrl(0x01, 0x01, 30, 0x00) # decrease speed for homing
+        

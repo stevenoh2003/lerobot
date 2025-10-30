@@ -140,8 +140,8 @@ MODEL_RESOLUTION = {
 # https://emanual.robotis.com/docs/en/dxl/x/{MODEL}/#control-table-of-eeprom-area
 MODEL_NUMBER_TABLE = {
     "xl330-m077": 1210, # MODIFIED
-    "xl330-m288": 1200,
-    "xl430-w250": 1060,
+    "xl330-m288": 1020, # modified, follower gripper
+    "xl430-w250": 1220,
     "xm430-w350": 1030, # MODIFIED
     "xm540-w270": 1120,
     "xc430-w150": 1070,

@@ -26,6 +26,7 @@ from lerobot.motors.dynamixel import (
     DynamixelMotorsBus,
     OperatingMode,
 )
+from collections import defaultdict
 
 from ..robot import Robot
 from ..utils import ensure_safe_goal_position
@@ -51,15 +52,28 @@ class KochFollower(Robot):
         self.bus = DynamixelMotorsBus(
             port=self.config.port,
             motors={
-                "shoulder_pan": Motor(1, "xl430-w250", norm_mode_body),
-                "shoulder_lift": Motor(2, "xl430-w250", norm_mode_body),
-                "elbow_flex": Motor(3, "xl330-m288", norm_mode_body),
-                "wrist_flex": Motor(4, "xl330-m288", norm_mode_body),
-                "wrist_roll": Motor(5, "xl330-m288", norm_mode_body),
-                "gripper": Motor(6, "xl330-m288", MotorNormMode.RANGE_0_100),
+                "joint_0": Motor(1, "xl330-m288", norm_mode_body),
+                "joint_1": Motor(2, "xl330-m288", norm_mode_body),
+                "joint_2": Motor(3, "xl330-m288", norm_mode_body),
+                "joint_3": Motor(4, "xl430-w250", norm_mode_body),
+                "joint_4": Motor(5, "xl430-w250", norm_mode_body),
+                "joint_5": Motor(6, "xl430-w250", norm_mode_body),
+                "joint_6": Motor(7, "xl330-m288", MotorNormMode.RANGE_0_100),
+
             },
             calibration=self.calibration,
         )
+
+        
+        self.dir_map = defaultdict(lambda: 1, {
+            "joint_0": +1,
+            "joint_1": -1,
+            "joint_2": +1,
+            "joint_3": +1,
+            "joint_4": +1,
+            "joint_5": +1,
+            "joint_6": +1,
+        })
         self.cameras = make_cameras_from_configs(config.cameras)
 
     @property
@@ -122,12 +136,16 @@ class KochFollower(Robot):
                 return
         logger.info(f"\nRunning calibration of {self}")
         for motor in self.bus.motors:
+            if motor == "joint_6":
+                print(motor)
+                self.bus.write("Operating_Mode", motor, OperatingMode.CURRENT_POSITION.value)  # joint_6 should not be in extended position mode
+
             self.bus.write("Operating_Mode", motor, OperatingMode.EXTENDED_POSITION.value)
 
         input(f"Move {self} to the middle of its range of motion and press ENTER....")
         homing_offsets = self.bus.set_half_turn_homings()
 
-        full_turn_motors = ["shoulder_pan", "wrist_roll"]
+        full_turn_motors = []
         unknown_range_motors = [motor for motor in self.bus.motors if motor not in full_turn_motors]
         print(
             f"Move all joints except {full_turn_motors} sequentially through their entire "
@@ -168,13 +186,20 @@ class KochFollower(Robot):
             # For the leader gripper, it means we can use it as a physical trigger, since we can force with
             # our finger to make it move, and it will move back to its original target position when we
             # release the force.
-            self.bus.write("Operating_Mode", "gripper", OperatingMode.CURRENT_POSITION.value)
+            # self.bus.write("Operating_Mode", "gripper", OperatingMode.CURRENT_POSITION.value)
 
             # Set better PID values to close the gap between recorded states and actions
             # TODO(rcadene): Implement an automatic procedure to set optimal PID values for each motor
-            self.bus.write("Position_P_Gain", "elbow_flex", 1500)
-            self.bus.write("Position_I_Gain", "elbow_flex", 0)
-            self.bus.write("Position_D_Gain", "elbow_flex", 600)
+            # self.bus.write("Position_P_Gain", "joint_2", 1500)
+            self.bus.write("Position_P_Gain", "joint_1", 600)
+            
+            self.bus.write("Position_I_Gain", "joint_1", 0)
+            self.bus.write("Position_D_Gain", "joint_1", 600)
+            
+            self.bus.write("Position_P_Gain", "joint_2", 600)
+            
+            self.bus.write("Position_I_Gain", "joint_2", 0)
+            self.bus.write("Position_D_Gain", "joint_2", 600)
 
     def setup_motors(self) -> None:
         for motor in reversed(self.bus.motors):
@@ -202,34 +227,63 @@ class KochFollower(Robot):
 
         return obs_dict
 
+    # def send_action(self, action: dict[str, float]) -> dict[str, float]:
+    #     """Command arm to move to a target joint configuration.
+
+    #     The relative action magnitude may be clipped depending on the configuration parameter
+    #     `max_relative_target`. In this case, the action sent differs from original action.
+    #     Thus, this function always returns the action actually sent.
+
+    #     Args:
+    #         action (dict[str, float]): The goal positions for the motors.
+
+    #     Returns:
+    #         dict[str, float]: The action sent to the motors, potentially clipped.
+    #     """
+    #     if not self.is_connected:
+    #         raise DeviceNotConnectedError(f"{self} is not connected.")
+
+    #     goal_pos = {key.removesuffix(".pos"): val for key, val in action.items() if key.endswith(".pos")}
+
+    #     # Cap goal position when too far away from present position.
+    #     # /!\ Slower fps expected due to reading from the follower.
+    #     if self.config.max_relative_target is not None:
+    #         present_pos = self.bus.sync_read("Present_Position")
+    #         goal_present_pos = {key: (g_pos, present_pos[key]) for key, g_pos in goal_pos.items()}
+    #         goal_pos = ensure_safe_goal_position(goal_present_pos, self.config.max_relative_target)
+
+    #     # Send goal position to the arm
+    #     print(goal_pos)
+    #     self.bus.sync_write("Goal_Position", goal_pos)
+    #     return {f"{motor}.pos": val for motor, val in goal_pos.items()}
+
     def send_action(self, action: dict[str, float]) -> dict[str, float]:
-        """Command arm to move to a target joint configuration.
-
-        The relative action magnitude may be clipped depending on the configuration parameter
-        `max_relative_target`. In this case, the action sent differs from original action.
-        Thus, this function always returns the action actually sent.
-
-        Args:
-            action (dict[str, float]): The goal positions for the motors.
-
-        Returns:
-            dict[str, float]: The action sent to the motors, potentially clipped.
-        """
         if not self.is_connected:
             raise DeviceNotConnectedError(f"{self} is not connected.")
 
-        goal_pos = {key.removesuffix(".pos"): val for key, val in action.items() if key.endswith(".pos")}
+        # Extract goals (strip ".pos")
+        goal_pos = {k.removesuffix(".pos"): v for k, v in action.items() if k.endswith(".pos")}
 
-        # Cap goal position when too far away from present position.
-        # /!\ Slower fps expected due to reading from the follower.
+        # --- special case: invert joint_6 ---
+        if "joint_6" in goal_pos:
+            inv = 100 - goal_pos["joint_6"]
+            # Optional clamp if you want to keep it in [0, 100]
+            # inv = max(0, min(100, inv))
+            goal_pos["joint_6"] = inv
+        # ------------------------------------
+
+        # Apply per-joint direction multipliers to others (default +1)
+        goal_pos = {k: (self.dir_map[k] * v if k != "joint_6" else v) for k, v in goal_pos.items()}
+
+        # Cap goal if too far from present position
         if self.config.max_relative_target is not None:
             present_pos = self.bus.sync_read("Present_Position")
-            goal_present_pos = {key: (g_pos, present_pos[key]) for key, g_pos in goal_pos.items()}
+            goal_present_pos = {k: (g, present_pos[k]) for k, g in goal_pos.items() if k in present_pos}
             goal_pos = ensure_safe_goal_position(goal_present_pos, self.config.max_relative_target)
 
-        # Send goal position to the arm
         self.bus.sync_write("Goal_Position", goal_pos)
-        return {f"{motor}.pos": val for motor, val in goal_pos.items()}
+        return {f"{m}.pos": v for m, v in goal_pos.items()}
+
 
     def disconnect(self):
         if not self.is_connected:
@@ -240,3 +294,20 @@ class KochFollower(Robot):
             cam.disconnect()
 
         logger.info(f"{self} disconnected.")
+
+    def send_zero_action(self) -> dict[str, float]:
+        """Send all joints to position 0.
+        
+        Args:
+            robot: The KochFollower robot instance
+            
+        Returns:
+            dict[str, float]: The action that was sent to the robot
+        """
+        # Create action dictionary with all joints set to 0
+        zero_action = {}
+        for motor in self.bus.motors:
+            zero_action[f"{motor}.pos"] = 0.0
+            
+
+        return self.send_action(zero_action)
