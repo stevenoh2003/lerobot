@@ -63,18 +63,18 @@ class Piper(Robot):
             "elbow_flex":    (-95.0,   95.0),
             "wrist_flex":    (-95.0,  95.0),
             "wrist_yaw":     (-95.0,  95.0),
-            "wrist_roll":    (-24.0,  47.0),
+            "wrist_roll":    (-50.0,  50.0), # protect gripper cable
             "gripper":       (  0.0, 100.0),
         }
         
         
-        # self.bus = DynamixelMotorsBus(
-        #     port=self.config.port,
-        #     motors={
-        #         "gripper": Motor(7, "xl330-m288", MotorNormMode.RANGE_0_100),
-        #     },
-        #     calibration=self.calibration,
-        # )
+        self.bus = DynamixelMotorsBus(
+            port=self.config.port,
+            motors={
+                "gripper": Motor(7, "xl330-m288", MotorNormMode.RANGE_0_100),
+            },
+            calibration=self.calibration,
+        )
 
 
     @property
@@ -104,7 +104,7 @@ class Piper(Robot):
         if self.is_connected:
             raise DeviceAlreadyConnectedError(f"{self} already connected")
 
-        # self.bus.connect()
+        self.bus.connect()
         if not self.is_calibrated and calibrate:
             logger.info(
                 "Mismatch between calibration values in the motor and the calibration file or no calibration file found"
@@ -128,7 +128,7 @@ class Piper(Robot):
         if not self.is_connected:
             raise DeviceNotConnectedError(f"{self} is not connected.")
 
-        # self.bus.disconnect(True)
+        self.bus.disconnect(True)
         for cam in self.cameras.values():
             cam.disconnect()
 
@@ -142,64 +142,63 @@ class Piper(Robot):
 
     @property
     def is_calibrated(self) -> bool:
-        pass
-        # return self.bus.is_calibrated
+        # pass
+        return self.bus.is_calibrated
  
     def calibrate(self) -> None:
-        pass
-        # self.bus.disable_torque()
-        # if self.calibration:
-        #     # Calibration file exists, ask user whether to use it or run new calibration
-        #     user_input = input(
-        #         f"Press ENTER to use provided calibration file associated with the id {self.id}, or type 'c' and press ENTER to run calibration: "
-        #     )
-        #     if user_input.strip().lower() != "c":
-        #         logger.info(f"Writing calibration file associated with the id {self.id} to the motors")
-        #         self.bus.write_calibration(self.calibration)
-        #         return
+        self.bus.disable_torque()
+        if self.calibration:
+            # Calibration file exists, ask user whether to use it or run new calibration
+            user_input = input(
+                f"Press ENTER to use provided calibration file associated with the id {self.id}, or type 'c' and press ENTER to run calibration: "
+            )
+            if user_input.strip().lower() != "c":
+                logger.info(f"Writing calibration file associated with the id {self.id} to the motors")
+                self.bus.write_calibration(self.calibration)
+                return
             
-        # logger.info(f"\nRunning calibration of {self}")
-        # for motor in self.bus.motors:
-        #     # use current based position for gripper
-        #     self.bus.write("Operating_Mode", motor, OperatingMode.CURRENT_POSITION.value)
+        logger.info(f"\nRunning calibration of {self}")
+        for motor in self.bus.motors:
+            # use current based position for gripper
+            self.bus.write("Operating_Mode", motor, OperatingMode.CURRENT_POSITION.value)
 
-        # # self.bus.write("Drive_Mode", "elbow_flex", DriveMode.INVERTED.value)
-        # drive_modes = {motor: 0 for motor in self.bus.motors}
+        # self.bus.write("Drive_Mode", "elbow_flex", DriveMode.INVERTED.value)
+        drive_modes = {motor: 0 for motor in self.bus.motors}
 
-        # input(f"Move {self} to the middle of its range of motion and press ENTER....")
-        # homing_offsets = self.bus.set_half_turn_homings()
+        input(f"Move {self} to the middle of its range of motion and press ENTER....")
+        homing_offsets = self.bus.set_half_turn_homings()
 
-        # # full_turn_motors = ["shoulder_pan", "wrist_roll"]
-        # unknown_range_motors = [motor for motor in self.bus.motors]
-        # # print(
-        # #     f"Move all joints except {full_turn_motors} sequentially through their "
-        # #     "entire ranges of motion.\nRecording positions. Press ENTER to stop..."
-        # # )
-        # range_mins, range_maxes = self.bus.record_ranges_of_motion(unknown_range_motors)
+        # full_turn_motors = ["shoulder_pan", "wrist_roll"]
+        unknown_range_motors = [motor for motor in self.bus.motors]
+        # print(
+        #     f"Move all joints except {full_turn_motors} sequentially through their "
+        #     "entire ranges of motion.\nRecording positions. Press ENTER to stop..."
+        # )
+        range_mins, range_maxes = self.bus.record_ranges_of_motion(unknown_range_motors)
 
 
-        # self.calibration = {}
-        # for motor, m in self.bus.motors.items():
-        #     self.calibration[motor] = MotorCalibration(
-        #         id=m.id,
-        #         drive_mode=drive_modes[motor],
-        #         homing_offset=homing_offsets[motor],
-        #         range_min=range_mins[motor],
-        #         range_max=range_maxes[motor],
-        #     )
+        self.calibration = {}
+        for motor, m in self.bus.motors.items():
+            self.calibration[motor] = MotorCalibration(
+                id=m.id,
+                drive_mode=drive_modes[motor],
+                homing_offset=homing_offsets[motor],
+                range_min=range_mins[motor],
+                range_max=range_maxes[motor],
+            )
 
-        # self.bus.write_calibration(self.calibration)
-        # self._save_calibration()
-        # logger.info(f"Calibration saved to {self.calibration_fpath}")
+        self.bus.write_calibration(self.calibration)
+        self._save_calibration()
+        logger.info(f"Calibration saved to {self.calibration_fpath}")
         
     def configure(self) -> None:
-        pass
-        # with self.bus.torque_disabled():
-        #     self.bus.configure_motors()
-        #     for motor in self.bus.motors:
-        #         if motor != "gripper":
-        #             self.bus.write("Operating_Mode", motor, OperatingMode.EXTENDED_POSITION.value)
-        #     self.bus.write("Operating_Mode", "gripper", OperatingMode.CURRENT_POSITION.value)
+        
+        with self.bus.torque_disabled():
+            self.bus.configure_motors()
+            for motor in self.bus.motors:
+                if motor != "gripper":
+                    self.bus.write("Operating_Mode", motor, OperatingMode.EXTENDED_POSITION.value)
+            self.bus.write("Operating_Mode", "gripper", OperatingMode.CURRENT_POSITION.value)
 
 
     def get_observation(self) -> dict[str, Any]:
@@ -270,11 +269,11 @@ class Piper(Robot):
 
 
     def send_gripper_action(self, goal_pos: float) -> None:
-        pass
-        # if not self.is_connected:
-        #     raise DeviceNotConnectedError(f"{self} is not connected.")
+        # pass
+        if not self.is_connected:
+            raise DeviceNotConnectedError(f"{self} is not connected.")
         
-        # return self.bus.sync_write("Goal_Position", goal_pos)
+        return self.bus.sync_write("Goal_Position", goal_pos)
 
 
     def clip_positions(self, positions: list[float], limits: dict[str, tuple[float, float]]) -> list[float]:

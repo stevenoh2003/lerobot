@@ -9,7 +9,7 @@ except ImportError:
     print("Is the piper_sdk installed: pip install piper_sdk")
     C_PiperInterface_V2 = None  # For type checking and docs
 
-
+        # # Set motion control to joint mode at 100% speed
 class PiperSDKInterface:
     def __init__(self, port: str = "can0"):
         if C_PiperInterface_V2 is None:
@@ -24,8 +24,6 @@ class PiperSDKInterface:
             return
 
         self.piper.ConnectPort()
- 
-
         time.sleep(0.1)  # wait for connection to establish
 
         # # # reset the arm if it's not in idle state
@@ -38,14 +36,7 @@ class PiperSDKInterface:
             self.piper.MotionCtrl_2(ctrl_mode=0x01, move_mode=0, move_spd_rate_ctrl=0, is_mit_mode=0x00)#位置速度模式
             
             
-        print(self.piper.GetArmStatus())
-        
-        # #     print(self.piper.GetArmStatus().arm_status.motion_status)
-        print(self.piper.GetArmStatus().arm_status.motion_status)
-
-
         # # Set motion control to joint mode at 100% speed
-
         self.piper.EnableArm(7, 0x02)  # enable all joints
         time.sleep(0.1)
 
@@ -54,25 +45,21 @@ class PiperSDKInterface:
 
         # self.piper.MotionCtrl_2(0x01, 0x01, 70, 0x00)
         self.piper.JointMaxAccConfig(motor_num=1, max_joint_acc=500)
-        self.piper.JointMaxAccConfig(motor_num=2, max_joint_acc=200)
-        self.piper.JointMaxAccConfig(motor_num=3, max_joint_acc=200)
+        self.piper.JointMaxAccConfig(motor_num=2, max_joint_acc=500)
+        self.piper.JointMaxAccConfig(motor_num=3, max_joint_acc=500)
         self.piper.JointMaxAccConfig(motor_num=4, max_joint_acc=500)
         self.piper.JointMaxAccConfig(motor_num=5, max_joint_acc=500)
         self.piper.JointMaxAccConfig(motor_num=6, max_joint_acc=500)
         # self.piper.JointMaxAccConfig(max_joint_acc=50)
         
         print("Robot config", self.piper.GetAllMotorAngleLimitMaxSpd())
-        input("Press Enter to continue...")
-        ## Previous speed settings
-        # self.piper.MotorMaxSpdSet(motor_num=4, max_joint_spd=300)
-        # self.piper.MotorMaxSpdSet(motor_num=5, max_joint_spd=300)
-        # self.piper.MotorMaxSpdSet(motor_num=6, max_joint_spd=300)
-        
-        
         # Improved speed settings
         self.piper.MotorMaxSpdSet(motor_num=4, max_joint_spd=1500) # was 300
-        self.piper.MotorMaxSpdSet(motor_num=5, max_joint_spd=3000) # was 300
-        self.piper.MotorMaxSpdSet(motor_num=6, max_joint_spd=3000) # was 300
+        self.piper.MotorMaxSpdSet(motor_num=5, max_joint_spd=1500) # was 300
+        self.piper.MotorMaxSpdSet(motor_num=6, max_joint_spd=1500) # was 300
+        self.piper.MotorMaxSpdSet(motor_num=4, max_joint_spd=1500) # was 300
+        self.piper.MotorMaxSpdSet(motor_num=5, max_joint_spd=1500) # was 300
+        self.piper.MotorMaxSpdSet(motor_num=6, max_joint_spd=1500) # was 300
         
         
         # # Get the min and max positions for each joint and gripper
